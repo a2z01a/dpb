@@ -4,6 +4,7 @@ import yt_dlp
 import asyncio
 import os
 import random
+from youtube_search import YoutubeSearch
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -34,8 +35,38 @@ class Music(commands.Cog):
             self.voice_client = await channel.connect()
         await channel.send("🎤 I've arrived! Who's ready for some tunes? 🎶")
 
+    
+
+    @commands.command()
+    async def search(self, ctx, *, query):
+        results = YoutubeSearch(query, max_results=5).to_dict()
+        if not results:
+            await ctx.send("No results found.")
+            return
+
+        embed = discord.Embed(title="Search Results", color=discord.Color.blue())
+        for i, video in enumerate(results, 1):
+            embed.add_field(name=f"{i}. {video['title']}", value=f"Duration: {video['duration']}", inline=False)
+
+        message = await ctx.send(embed=embed)
+
+        def check(m):
+            return m.author == ctx.author and m.channel == ctx.channel and m.content.isdigit() and 1 <= int(m.content) <= 5
+
+        try:
+            response = await self.bot.wait_for('message', check=check, timeout=30.0)
+            selected = results[int(response.content) - 1]
+            await self.play(ctx, query=f"https://youtube.com{selected['url_suffix']}")
+        except asyncio.TimeoutError:
+            await ctx.send("Search timed out.")
+        finally:
+            await message.delete()
+    
     @commands.command()
     async def play(self, ctx, *, query):
+        if not query.startswith('http'):
+            await self.search(ctx, query=query)
+            return
         async with ctx.typing():
             song_info = await self.get_song_info(query)
             if song_info:
@@ -78,15 +109,14 @@ class Music(commands.Cog):
 
     async def get_song_info(self, query):
         ydl_opts = {
-    'format': 'bestaudio/best',
-    'noplaylist': True,
-    'extract_flat': True,
-    'skipdownload': True,
-    'forcejson': True,
-    'nocheckcertificate': True,
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'format': 'bestaudio/best',
+            'noplaylist': True,
+            'extract_flat': True,
+            'skipdownload': True,
+            'forcejson': True,
+            'nocheckcertificate': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
 }
-    
         ydl_opts['nocheckcertificate'] = True
     
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
