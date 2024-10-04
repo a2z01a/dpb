@@ -39,7 +39,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def search(self, ctx, *, query):
-        search = VideosSearch(query, limit=5)
+        search = YoutubeSearch(query, limit=5)
         results = search.result()['result']
     
         if not results:
