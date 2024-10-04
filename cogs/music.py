@@ -78,17 +78,14 @@ class Music(commands.Cog):
 
     async def get_song_info(self, query):
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'noplaylist': True,
-            'extract_flat': True,
-            'skipdownload': True,
-            'forcejson': True,
-        }
-    
-        # Create a custom SSL context
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
+    'format': 'bestaudio/best',
+    'noplaylist': True,
+    'extract_flat': True,
+    'skipdownload': True,
+    'forcejson': True,
+    'nocheckcertificate': True,
+    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+}
     
         ydl_opts['nocheckcertificate'] = True
     
