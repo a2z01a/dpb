@@ -5,6 +5,8 @@ import asyncio
 import os
 import random
 from youtube_search import YoutubeSearch
+from googleapiclient.discovery import build
+import config
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -15,6 +17,7 @@ class Music(commands.Cog):
         self.is_playing = False
         self.download_queue = asyncio.Queue()
         self.download_task = None
+        self.youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -107,12 +110,12 @@ class Music(commands.Cog):
                 embed.add_field(name=f"{i+1}. {song['title']}", value=f"Duration: {song['duration']//60}:{song['duration']%60:02d}", inline=False)
             await ctx.send(embed=embed)
 
-    import ssl
+    import re
 
     async def get_song_info(self, query):
         try:
             if not query.startswith('http'):
-                search_response = youtube.search().list(
+                search_response = self.youtube.search().list(
                     q=query,
                     type="video",
                     part="id,snippet",
@@ -126,8 +129,14 @@ class Music(commands.Cog):
                 url = f"https://www.youtube.com/watch?v={video_id}"
             else:
                 url = query
+                # Extract video ID from URL
+                video_id = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+                if video_id:
+                video_id = video_id.group(1)
+                else:
+                    return None
 
-            video_response = youtube.videos().list(
+            video_response = self.youtube.videos().list(
                 part="snippet,contentDetails",
                 id=video_id
             ).execute()
