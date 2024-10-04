@@ -39,7 +39,9 @@ class Music(commands.Cog):
 
     @commands.command()
     async def search(self, ctx, *, query):
-        results = YoutubeSearch(query, max_results=5).to_dict()
+        search = VideosSearch(query, limit=5)
+        results = search.result()['result']
+    
         if not results:
             await ctx.send("No results found.")
             return
@@ -56,7 +58,7 @@ class Music(commands.Cog):
         try:
             response = await self.bot.wait_for('message', check=check, timeout=30.0)
             selected = results[int(response.content) - 1]
-            await self.play(ctx, query=f"https://youtube.com{selected['url_suffix']}")
+            await self.play(ctx, query=selected['link'])
         except asyncio.TimeoutError:
             await ctx.send("Search timed out.")
         finally:
