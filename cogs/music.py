@@ -44,16 +44,21 @@ class Music(commands.Cog):
     @commands.command()
     async def search(self, ctx, *, query):
         search = YoutubeSearch(query)  # Removed 'limit=5'
-        results = search.result().get('result', [])
+        results = YoutubeSearch('your search term', max_results=10).to_dict()
 
         # Limit results manually
         limited_results = results[:5]  # Get only the first 5 results
 
-        if not limited_results:
-            await ctx.send("No results found.")
+        if not search_results or 'videos' not in search_results:
+            await ctx.send("No results found for your search.")
             return
 
-        # Continue processing limited_results
+        video = search_results['videos'][0]
+        video_url = "https://www.youtube.com" + video['url_suffix']  # Extract the URL  suffix and build the full URL
+    
+        # Send message to the channel with the URL
+        await ctx.send(f"Now playing: {video['title']} \n{video_url}")
+        await play_youtube_audio(ctx, video_url)
 
 
         embed = discord.Embed(title="Search Results", color=discord.Color.blue())
