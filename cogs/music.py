@@ -110,36 +110,47 @@ class Music(commands.Cog):
     import ssl
 
     async def get_song_info(self, query):
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'noplaylist': True,
-            'extract_flat': True,
-            'skipdownload': True,
-            'forcejson': True,
-            'nocheckcertificate': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-}
-        ydl_opts['nocheckcertificate'] = True
-    
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
-                info = await self.bot.loop.run_in_executor(None, lambda: ydl.extract_info(query, download=False))
-                if info is None:
-                    print(f"No info found for query: {query}")
+        try:
+            if not query.startswith('http'):
+                search_response = youtube.search().list(
+                    q=query,
+                    type="video",
+                    part="id,snippet",
+                    maxResults=1
+                ).execute()
+
+                if not search_response['items']:
                     return None
-                if 'entries' in info:
-                    info = info['entries'][0]
-                if 'url' not in info:
-                    print(f"No URL found in info for query: {query}")
-                    return None
-                return {
-                    'title': info.get('title', 'Unknown Title'),
-                    'url': info['url'],
-                    'duration': info.get('duration', 0)
-                }
-            except Exception as e:
-                print(f"Error fetching video info: {e}")
+
+                video_id = search_response['items'][0]['id']['videoId']
+                url = f"https://www.youtube.com/watch?v={video_id}"
+            else:
+                url = query
+
+            video_response = youtube.videos().list(
+                part="snippet,contentDetails",
+                id=video_id
+            ).execute()
+
+            if not video_response['items']:
                 return None
+
+            video_info = video_response['items'][0]
+            return {
+                'title': video_info['snippet']['title'],
+                'url': url,
+                'duration': self.parse_duration(video_info['contentDetails']['duration'])
+            }
+        except Exception as e:
+            print(f"Error fetching video info: {e}")
+            return None
+
+    def parse_duration(self, duration):
+        match = re.match(r'PT(\d+H)?(\d+M)?(\d+S)?', duration)
+        hours = int(match.group(1)[:-1]) if match.group(1) else 0
+        minutes = int(match.group(2)[:-1]) if match.group(2) else 0
+        seconds = int(match.group(3)[:-1]) if match.group(3) else 0
+        return hours * 3600 + minutes * 60 + seconds
 
     async def download_songs(self):
         while True:
