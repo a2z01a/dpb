@@ -132,7 +132,7 @@ class Music(commands.Cog):
                 # Extract video ID from URL
                 video_id = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
                 if video_id:
-                video_id = video_id.group(1)
+                    video_id = video_id.group(1)
                 else:
                     return None
 
