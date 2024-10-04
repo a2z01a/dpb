@@ -1,13 +1,10 @@
 ﻿import discord
 from discord.ext import commands
-import yt_dlp
 import asyncio
 import os
 import random
-from youtube_search import YoutubeSearch
-from googleapiclient.discovery import build
-import config
-import re
+from pytube import YouTube
+from pytube import Search
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -18,7 +15,6 @@ class Music(commands.Cog):
         self.is_playing = False
         self.download_queue = asyncio.Queue()
         self.download_task = None
-        self.youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
@@ -126,40 +122,19 @@ class Music(commands.Cog):
     async def get_song_info(self, query):
         try:
             if not query.startswith('http'):
-                search_response = self.youtube.search().list(
-                    q=query,
-                    type="video",
-                    part="id,snippet",
-                    maxResults=1
-                ).execute()
-
-                if not search_response['items']:
+                s = Search(query)
+                if not s.results:
                     return None
-
-                video_id = search_response['items'][0]['id']['videoId']
-                url = f"https://www.youtube.com/watch?v={video_id}"
+                video = s.results[0]
+                url = f"https://www.youtube.com/watch?v={video.video_id}"
             else:
                 url = query
-                # Extract video ID from URL
-                video_id = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
-                if video_id:
-                    video_id = video_id.group(1)
-                else:
-                    return None
+                video = YouTube(url)
 
-            video_response = self.youtube.videos().list(
-                part="snippet,contentDetails",
-                id=video_id
-            ).execute()
-
-            if not video_response['items']:
-                return None
-
-            video_info = video_response['items'][0]
             return {
-                'title': video_info['snippet']['title'],
+                'title': video.title,
                 'url': url,
-                'duration': self.parse_duration(video_info['contentDetails']['duration'])
+                'duration': video.length
             }
         except Exception as e:
             print(f"Error fetching video info: {e}")
@@ -176,21 +151,13 @@ class Music(commands.Cog):
         while True:
             song = await self.download_queue.get()
             file_name = f"{song['title']}.mp3"
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-                'outtmpl': file_name,
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                try:
-                    await self.bot.loop.run_in_executor(None, lambda: ydl.download([song['url']]))
-                    song['file_path'] = file_name
-                except Exception as e:
-                    print(f"Error downloading {song['title']}: {e}")
+            try:
+                yt = YouTube(song['url'])
+                audio_stream = yt.streams.filter(only_audio=True).first()
+                audio_stream.download(filename=file_name)
+                song['file_path'] = file_name
+            except Exception as e:
+                print(f"Error downloading {song['title']}: {e}")
             self.download_queue.task_done()
 
     async def play_next(self):
