@@ -38,7 +38,7 @@ class Music(commands.Cog):
     @commands.command()
     async def search(self, ctx, *, query):
         videosSearch = VideosSearch(query, limit=5)
-        results = await videosSearch.next()
+        results = videosSearch.result()
     
         if not results['result']:
             await ctx.send("No results found.")
