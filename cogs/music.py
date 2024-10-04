@@ -3,7 +3,8 @@ from discord.ext import commands
 import asyncio
 import os
 import random
-from pytube import YouTube, Search
+from pytube import YouTube
+from youtubesearchpython.__future__ import VideosSearch
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -36,8 +37,8 @@ class Music(commands.Cog):
 
     @commands.command()
     async def search(self, ctx, *, query):
-        search = Search(query)
-        results = search.results[:5]
+        videosSearch = VideosSearch(query, limit=5)
+        results = await videosSearch.next()
     
         if not results:
             await ctx.send("No results found.")
@@ -45,7 +46,9 @@ class Music(commands.Cog):
 
         embed = discord.Embed(title="Search Results", color=discord.Color.blue())
         for i, video in enumerate(results, 1):
-            embed.add_field(name=f"{i}. {video.title}", value=f"Duration: {video.length//60}:{video.length%60:02d}", inline=False)
+            duration = video['duration'].split(':')
+            duration = f"{int(duration[0])}:{int(duration[1]):02d}" if len(duration) > 1 else f"0:{duration[0]}"
+            embed.add_field(name=f"{i}. {video['title']}", value=f"Duration: {duration}", inline=False)
 
         message = await ctx.send(embed=embed)
 
@@ -55,7 +58,7 @@ class Music(commands.Cog):
         try:
             response = await self.bot.wait_for('message', check=check, timeout=30.0)
             selected = results[int(response.content) - 1]
-            await self.play(ctx, query=selected.watch_url)
+            await self.play(ctx, query=selected['link'])
         except asyncio.TimeoutError:
             await ctx.send("Search timed out.")
         finally:
