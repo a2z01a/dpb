@@ -35,21 +35,21 @@ class Music(commands.Cog):
         await channel.send("🎤 I've arrived! Who's ready for some tunes? 🎶")
 
     @commands.command()
-async def play(self, ctx, *, query):
-    async with ctx.typing():
-        song_info = await self.get_song_info(query)
-        if song_info:
-            self.queue.append(song_info)
-            await self.download_queue.put(song_info)
-            embed = discord.Embed(title="🎵 Added to Queue", description=f"**{song_info['title']}**", color=discord.Color.green())
-            embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.avatar.url)
-            await ctx.send(embed=embed)
-            if not self.is_playing:
-                await self.play_next()
-            if not self.download_task:
-                self.download_task = asyncio.create_task(self.download_songs())
-        else:
-            await ctx.send("😕 Oops! I couldn't find that song or there was an error. Maybe try another?")
+    async def play(self, ctx, *, query):
+        async with ctx.typing():
+            song_info = await self.get_song_info(query)
+            if song_info:
+                self.queue.append(song_info)
+                await self.download_queue.put(song_info)
+                embed = discord.Embed(title="🎵 Added to Queue", description=f"**{song_info['title']}**", color=discord.Color.green())
+                embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.avatar.url)
+                await ctx.send(embed=embed)
+                if not self.is_playing:
+                    await self.play_next()
+                if not self.download_task:
+                    self.download_task = asyncio.create_task(self.download_songs())
+            else:
+                await ctx.send("😕 Oops! I couldn't find that song or there was an error. Maybe try another?")
 
     @commands.command()
     async def skip(self, ctx):
@@ -76,41 +76,41 @@ async def play(self, ctx, *, query):
 
     import ssl
 
-async def get_song_info(self, query):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'extract_flat': True,
-        'skipdownload': True,
-        'forcejson': True,
-    }
+    async def get_song_info(self, query):
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'noplaylist': True,
+            'extract_flat': True,
+            'skipdownload': True,
+            'forcejson': True,
+        }
     
-    # Create a custom SSL context
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+        # Create a custom SSL context
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
     
-    ydl_opts['nocheckcertificate'] = True
+        ydl_opts['nocheckcertificate'] = True
     
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            info = await self.bot.loop.run_in_executor(None, lambda: ydl.extract_info(query, download=False))
-            if info is None:
-                print(f"No info found for query: {query}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            try:
+                info = await self.bot.loop.run_in_executor(None, lambda: ydl.extract_info(query, download=False))
+                if info is None:
+                    print(f"No info found for query: {query}")
+                    return None
+                if 'entries' in info:
+                    info = info['entries'][0]
+                if 'url' not in info:
+                    print(f"No URL found in info for query: {query}")
+                    return None
+                return {
+                    'title': info.get('title', 'Unknown Title'),
+                    'url': info['url'],
+                    'duration': info.get('duration', 0)
+                }
+            except Exception as e:
+                print(f"Error fetching video info: {e}")
                 return None
-            if 'entries' in info:
-                info = info['entries'][0]
-            if 'url' not in info:
-                print(f"No URL found in info for query: {query}")
-                return None
-            return {
-                'title': info.get('title', 'Unknown Title'),
-                'url': info['url'],
-                'duration': info.get('duration', 0)
-            }
-        except Exception as e:
-            print(f"Error fetching video info: {e}")
-            return None
 
     async def download_songs(self):
         while True:
