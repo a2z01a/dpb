@@ -7,6 +7,7 @@ import random
 from youtube_search import YoutubeSearch
 from googleapiclient.discovery import build
 import config
+import re
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -110,7 +111,6 @@ class Music(commands.Cog):
                 embed.add_field(name=f"{i+1}. {song['title']}", value=f"Duration: {song['duration']//60}:{song['duration']%60:02d}", inline=False)
             await ctx.send(embed=embed)
 
-    import re
 
     async def get_song_info(self, query):
         try:
