@@ -4,7 +4,7 @@ import asyncio
 import os
 import random
 from pytube import YouTube
-from youtubesearchpython.__future__ import VideosSearch
+from youtubesearchpython import VideosSearch
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -40,14 +40,13 @@ class Music(commands.Cog):
         videosSearch = VideosSearch(query, limit=5)
         results = await videosSearch.next()
     
-        if not results:
+        if not results['result']:
             await ctx.send("No results found.")
             return
 
         embed = discord.Embed(title="Search Results", color=discord.Color.blue())
-        for i, video in enumerate(results, 1):
-            duration = video['duration'].split(':')
-            duration = f"{int(duration[0])}:{int(duration[1]):02d}" if len(duration) > 1 else f"0:{duration[0]}"
+        for i, video in enumerate(results['result'], 1):
+            duration = video['duration']
             embed.add_field(name=f"{i}. {video['title']}", value=f"Duration: {duration}", inline=False)
 
         message = await ctx.send(embed=embed)
@@ -57,7 +56,7 @@ class Music(commands.Cog):
 
         try:
             response = await self.bot.wait_for('message', check=check, timeout=30.0)
-            selected = results[int(response.content) - 1]
+            selected = results['result'][int(response.content) - 1]
             await self.play(ctx, query=selected['link'])
         except asyncio.TimeoutError:
             await ctx.send("Search timed out.")
