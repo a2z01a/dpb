@@ -3,8 +3,7 @@ from discord.ext import commands
 import asyncio
 import os
 import random
-from pytube import YouTube
-from pytube import Search
+from pytube import YouTube, Search
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -35,31 +34,18 @@ class Music(commands.Cog):
             self.voice_client = await channel.connect()
         await channel.send("🎤 I've arrived! Who's ready for some tunes? 🎶")
 
-    
-
     @commands.command()
     async def search(self, ctx, *, query):
-        search = YoutubeSearch(query)  # Removed 'limit=5'
-        results = YoutubeSearch('your search term', max_results=10).to_dict()
-
-        # Limit results manually
-        limited_results = results[:5]  # Get only the first 5 results
-
-        if not search_results or 'videos' not in search_results:
-            await ctx.send("No results found for your search.")
-            return
-
-        video = search_results['videos'][0]
-        video_url = "https://www.youtube.com" + video['url_suffix']  # Extract the URL  suffix and build the full URL
+        search = Search(query)
+        results = search.results[:5]
     
-        # Send message to the channel with the URL
-        await ctx.send(f"Now playing: {video['title']} \n{video_url}")
-        await play_youtube_audio(ctx, video_url)
-
+        if not results:
+            await ctx.send("No results found.")
+            return
 
         embed = discord.Embed(title="Search Results", color=discord.Color.blue())
         for i, video in enumerate(results, 1):
-            embed.add_field(name=f"{i}. {video['title']}", value=f"Duration: {video['duration']}", inline=False)
+            embed.add_field(name=f"{i}. {video.title}", value=f"Duration: {video.length//60}:{video.length%60:02d}", inline=False)
 
         message = await ctx.send(embed=embed)
 
@@ -69,7 +55,7 @@ class Music(commands.Cog):
         try:
             response = await self.bot.wait_for('message', check=check, timeout=30.0)
             selected = results[int(response.content) - 1]
-            await self.play(ctx, query=selected['link'])
+            await self.play(ctx, query=selected.watch_url)
         except asyncio.TimeoutError:
             await ctx.send("Search timed out.")
         finally:
@@ -77,9 +63,17 @@ class Music(commands.Cog):
     
     @commands.command()
     async def play(self, ctx, *, query):
+        if not ctx.author.voice:
+            await ctx.send("You need to be in a voice channel to use this command!")
+            return
+
+        if not self.voice_client:
+            await self.join_voice_channel(ctx.author.voice.channel)
+
         if not query.startswith('http'):
             await self.search(ctx, query=query)
             return
+
         async with ctx.typing():
             song_info = await self.get_song_info(query)
             if song_info:
@@ -118,34 +112,17 @@ class Music(commands.Cog):
                 embed.add_field(name=f"{i+1}. {song['title']}", value=f"Duration: {song['duration']//60}:{song['duration']%60:02d}", inline=False)
             await ctx.send(embed=embed)
 
-
-    async def get_song_info(self, query):
+    async def get_song_info(self, url):
         try:
-            if not query.startswith('http'):
-                s = Search(query)
-                if not s.results:
-                    return None
-                video = s.results[0]
-                url = f"https://www.youtube.com/watch?v={video.video_id}"
-            else:
-                url = query
-                video = YouTube(url)
-
+            yt = YouTube(url)
             return {
-                'title': video.title,
+                'title': yt.title,
                 'url': url,
-                'duration': video.length
+                'duration': yt.length
             }
         except Exception as e:
             print(f"Error fetching video info: {e}")
             return None
-
-    def parse_duration(self, duration):
-        match = re.match(r'PT(\d+H)?(\d+M)?(\d+S)?', duration)
-        hours = int(match.group(1)[:-1]) if match.group(1) else 0
-        minutes = int(match.group(2)[:-1]) if match.group(2) else 0
-        seconds = int(match.group(3)[:-1]) if match.group(3) else 0
-        return hours * 3600 + minutes * 60 + seconds
 
     async def download_songs(self):
         while True:
