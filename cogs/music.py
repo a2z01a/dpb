@@ -39,7 +39,7 @@ class Music(commands.Cog):
     async def search(self, ctx, *, query):
         videosSearch = VideosSearch(query, limit=5)
         results = videosSearch.result()
-    
+
         if not results['result']:
             await ctx.send("No results found.")
             return
@@ -72,24 +72,40 @@ class Music(commands.Cog):
         if not self.voice_client:
             await self.join_voice_channel(ctx.author.voice.channel)
 
+        # Validate query: If it's not a valid YouTube URL, initiate search
         if not query.startswith('http'):
             await self.search(ctx, query=query)
             return
 
         async with ctx.typing():
+            # Fetch song information
             song_info = await self.get_song_info(query)
-            if song_info:
-                self.queue.append(song_info)
-                await self.download_queue.put(song_info)
-                embed = discord.Embed(title="🎵 Added to Queue", description=f"**{song_info['title']}**", color=discord.Color.green())
-                embed.set_footer(text=f"Requested by {ctx.author.display_name}", icon_url=ctx.author.avatar.url)
-                await ctx.send(embed=embed)
-                if not self.is_playing:
-                    await self.play_next()
-                if not self.download_task:
-                    self.download_task = asyncio.create_task(self.download_songs())
-            else:
+        
+            if song_info is None:
                 await ctx.send("😕 Oops! I couldn't find that song or there was an error. Maybe try another?")
+                return
+
+            # Add the song to the queue and download if needed
+            self.queue.append(song_info)
+            await self.download_queue.put(song_info)
+
+            embed = discord.Embed(
+                title="🎵 Added to Queue", 
+                description=f"**{song_info['title']}**", 
+                color=discord.Color.green()
+            )
+            embed.set_footer(
+                text=f"Requested by {ctx.author.display_name}", 
+                icon_url=ctx.author.avatar.url
+            )
+            await ctx.send(embed=embed)
+
+            if not self.is_playing:
+                await self.play_next()
+
+            if not self.download_task:
+                self.download_task = asyncio.create_task(self.download_songs())
+
 
     @commands.command()
     async def skip(self, ctx):
@@ -123,7 +139,8 @@ class Music(commands.Cog):
                 'duration': yt.length
             }
         except Exception as e:
-            print(f"Error fetching video info: {e}")
+            # Log the error and URL causing the issue
+            print(f"Error fetching video info from URL {url}: {e}")
             return None
 
     async def download_songs(self):
