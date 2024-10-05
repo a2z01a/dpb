@@ -35,7 +35,7 @@ class Music(commands.Cog):
             self.voice_client = await channel.connect()
         await channel.send("🎤 I've arrived! Who's ready for some tunes? 🎶")
 
-    @commands.command()
+    @commands.command(aliases=['s'])  # Short form !s
     async def search(self, ctx, *, query):
         videosSearch = VideosSearch(query, limit=5)
         results = videosSearch.result()
@@ -63,7 +63,7 @@ class Music(commands.Cog):
         finally:
             await message.delete()
     
-    @commands.command()
+    @commands.command(aliases=['p'])  # Allow short form like !p
     async def play(self, ctx, *, query):
         if not ctx.author.voice:
             await ctx.send("You need to be in a voice channel to use this command!")
@@ -72,41 +72,53 @@ class Music(commands.Cog):
         if not self.voice_client:
             await self.join_voice_channel(ctx.author.voice.channel)
 
-        # Validate query: If it's not a valid YouTube URL, initiate search
         if not query.startswith('http'):
             await self.search(ctx, query=query)
             return
 
         async with ctx.typing():
-            # Fetch song information
             song_info = await self.get_song_info(query)
-        
-            if song_info is None:
-                await ctx.send("😕 Oops! I couldn't find that song or there was an error. Maybe try another?")
-                return
+            if song_info:
+                self.queue.append(song_info)
+                await self.download_queue.put(song_info)
 
-            # Add the song to the queue and download if needed
-            self.queue.append(song_info)
-            await self.download_queue.put(song_info)
+                embed = discord.Embed(
+                    title="🎵 Added to Queue", 
+                    description=f"**{song_info['title']}**", 
+                    color=discord.Color.green()
+                )
+                embed.set_footer(
+                    text=f"Requested by {ctx.author.display_name}", 
+                    icon_url=ctx.author.avatar.url
+                )
+                await ctx.send(embed=embed)
 
-            embed = discord.Embed(
-                title="🎵 Added to Queue", 
-                description=f"**{song_info['title']}**", 
-                color=discord.Color.green()
-            )
-            embed.set_footer(
-                text=f"Requested by {ctx.author.display_name}", 
-                icon_url=ctx.author.avatar.url
-            )
-            await ctx.send(embed=embed)
+                if not self.is_playing:
+                    await self.play_next()
+                if not self.download_task:
+                    self.download_task = asyncio.create_task(self.download_songs())
+            else:
+                await ctx.send("😕 Oops! I couldn't find that song or there was an error. Please try again.")
 
-            if not self.is_playing:
-                await self.play_next()
+    @commands.command(aliases=['pl'])  # Short form !pl
+    async def playlist(self, ctx, *, playlist_url):
+        # Simulate fetching playlist songs (you need a separate method to handle playlists)
+        playlist_songs = await self.get_playlist_songs(playlist_url)
+        if not playlist_songs:
+            await ctx.send("Couldn't fetch playlist. Please try a different one.")
+            return
 
-            if not self.download_task:
-                self.download_task = asyncio.create_task(self.download_songs())
+        for song in playlist_songs:
+            self.queue.append(song)
+            await self.download_queue.put(song)
 
-
+        await ctx.send(f"Added {len(playlist_songs)} songs from the playlist to the queue!" )
+    
+        if not self.is_playing:
+            await self.play_next()
+        if not self.download_task:
+            self.download_task = asyncio.create_task(self.download_songs())
+            
     @commands.command()
     async def skip(self, ctx):
         if self.voice_client and self.voice_client.is_playing():
